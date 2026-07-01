@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { UnitData } from "@/lib/types";
-import VocabList from "./VocabList";
+import VocabSection from "./VocabSection";
 import PracticeBlocks from "./PracticeBlocks";
 import AnswerBlocks from "./AnswerBlocks";
 
@@ -41,7 +41,7 @@ export default function UnitTabs({ unit }: { unit: UnitData }) {
       </div>
 
       <div className="rounded-b-lg rounded-tr-lg border-2 border-line bg-paper-light p-4 sm:p-6">
-        {tab === "vocab" && <VocabList vocab={unit.vocabulary} />}
+        {tab === "vocab" && <VocabSection vocab={unit.vocabulary} />}
         {tab === "practice" && (
           <>
             <div className="mb-5 rounded-md border-2 border-chalk-blue/40 bg-chalk-blue/5 px-4 py-3 text-sm text-ink-soft">
