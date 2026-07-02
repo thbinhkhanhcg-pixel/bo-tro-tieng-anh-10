@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import type { VocabEntry } from "@/lib/types";
+import PronounceButton from "./PronounceButton";
 
 function shuffle<T>(arr: T[]): T[] {
   const a = [...arr];
@@ -114,8 +115,9 @@ export default function VocabQuiz({ vocab }: { vocab: VocabEntry[] }) {
         <p className="text-center font-mono-tag text-[11px] uppercase tracking-widest text-chalk-blue">
           Từ này nghĩa là gì?
         </p>
-        <h3 className="mt-2 text-center font-display text-3xl font-700 text-ink">
+        <h3 className="mt-2 flex items-center justify-center gap-2 text-center font-display text-3xl font-700 text-ink">
           {q.term.term}
+          <PronounceButton text={q.term.term} size="md" />
         </h3>
         {q.term.ipa && (
           <p className="mt-1 text-center font-mono-tag text-sm text-brick">
