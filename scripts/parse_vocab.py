@@ -12,6 +12,14 @@ VOCAB_MARKER_RE = re.compile(r'^\s*(?:[IVXLC]+\.\s*)?VOCABULARY\s*:?\s*$', re.IG
 
 VOCAB_ENTRY_RE = re.compile(r'^\s*(?:(\d{1,3})[\.\)]\s*|[●•\-]\s+)(\S.*)$')
 
+def looks_like_vocab_entry(rest):
+    """A genuine vocab line always separates term from meaning with either an
+    IPA slash '/.../' or a ':' (with or without a part-of-speech tag in between).
+    Plain instructional sentences (e.g. a stray phonetics-exercise line that slipped
+    in because the source document didn't use one of our recognised stop-headings)
+    have neither, so we treat their absence as the real end of the vocab block."""
+    return (":" in rest) or ("/" in rest)
+
 def parse_vocab_block(lines):
     """lines: list of raw lines starting right after the 'VOCABULARY' marker.
     Returns (entries, consumed_line_count)"""
@@ -30,10 +38,14 @@ def parse_vocab_block(lines):
             continue
         m = VOCAB_ENTRY_RE.match(line)
         if m:
+            num, rest = m.group(1), m.group(2)
+            if started and not looks_like_vocab_entry(rest):
+                # doesn't look like a real vocab line (e.g. a leaked exercise
+                # instruction) -> the vocab block genuinely ends here.
+                break
             started = True
             if cur:
                 entries.append(cur)
-            num, rest = m.group(1), m.group(2)
             auto_num += 1
             cur = {"num": int(num) if num else auto_num, "raw": rest}
             i += 1
@@ -101,7 +113,11 @@ def extract_vocab_for_unit(raw_unit_text):
     if marker_idx is None:
         return [], raw_unit_text  # no vocab block found near start
     entries_raw, consumed = parse_vocab_block(lines[marker_idx+1:])
-    entries = [structure_vocab_entry(e["raw"]) for e in entries_raw]
+    entries = []
+    for idx, e in enumerate(entries_raw):
+        structured = structure_vocab_entry(e["raw"])
+        structured["num"] = e.get("num", idx + 1)
+        entries.append(structured)
     body_start = marker_idx + 1 + consumed
     body = "\n".join(lines[body_start:])
     return entries, body
