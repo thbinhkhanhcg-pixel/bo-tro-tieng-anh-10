@@ -25,6 +25,11 @@ export type ContentBlock =
       text: string;
       options: OptionBlock[];
       answers?: string[];
+      /** Verified correct option letter, cross-referenced from the teacher's file.
+       *  Only present when a high-confidence match was found — never guessed. */
+      correctLetter?: string;
+      /** Verified correct fill-in answer(s), cross-referenced from the teacher's file. */
+      correctAnswers?: string[];
     };
 
 export interface UnitData {

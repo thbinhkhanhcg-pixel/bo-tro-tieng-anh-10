@@ -35,6 +35,64 @@ def block_char_count(blocks):
             total += len(b["text"])
     return total
 
+
+def build_answer_index(answer_blocks):
+    """Map (h2, h3, item_num) -> first matching GV item block, for high-confidence
+    cross-referencing of student (HS) exercise items to their teacher (GV) counterpart."""
+    index = {}
+    h2 = h3 = None
+    for b in answer_blocks:
+        if b["type"] == "h2":
+            h2 = b["text"]; h3 = None
+        elif b["type"] == "h3":
+            h3 = b["text"]
+        elif b["type"] == "item":
+            key = (h2, h3, b["num"])
+            if key not in index:
+                index[key] = b
+    return index
+
+
+def enrich_with_answers(practice_blocks, answer_index):
+    """Attach a verified correct answer to each HS exercise item where a matching,
+    unambiguous GV counterpart with a detected (bold-marked) answer exists.
+    Never invents an answer: items without a confident match are left un-graded
+    and the frontend must treat them as practice-only."""
+    h2 = h3 = None
+    enriched = []
+    stats = {"mcq_total": 0, "mcq_graded": 0, "exercise_total": 0, "exercise_graded": 0}
+    for b in practice_blocks:
+        nb = dict(b)
+        if b["type"] == "h2":
+            h2 = b["text"]; h3 = None
+        elif b["type"] == "h3":
+            h3 = b["text"]
+        elif b["type"] == "item":
+            if b["itemType"] == "mcq":
+                stats["mcq_total"] += 1
+            elif b["itemType"] == "exercise":
+                stats["exercise_total"] += 1
+            match = answer_index.get((h2, h3, b["num"]))
+            if match:
+                if b["itemType"] == "mcq" and b.get("options"):
+                    correct = next(
+                        (o["letter"] for o in match.get("options", []) if o.get("bold")),
+                        None,
+                    )
+                    # only trust the match if option letters correspond 1:1 (same set of
+                    # letters), guarding against a section-drift mismatch slipping through
+                    hs_letters = {o["letter"] for o in b["options"]}
+                    gv_letters = {o["letter"] for o in match.get("options", [])}
+                    if correct and hs_letters == gv_letters:
+                        nb["correctLetter"] = correct
+                        stats["mcq_graded"] += 1
+                elif b["itemType"] == "exercise" and match.get("answers"):
+                    nb["correctAnswers"] = match["answers"]
+                    stats["exercise_graded"] += 1
+        enriched.append(nb)
+    return enriched, stats
+
+
 units_out = {}
 for n in range(1, 11):
     hs_raw = data["hs"][n]["raw"]
@@ -52,6 +110,9 @@ for n in range(1, 11):
     # tab is meant to show the complete original GV content anyway.
     answer_blocks = parse_body_bold(gvb_raw)
 
+    answer_index = build_answer_index(answer_blocks)
+    practice_blocks, stats = enrich_with_answers(practice_blocks, answer_index)
+
     units_out[n] = {
         "number": n,
         "titleEn": data["hs"][n]["title"].strip(),
@@ -64,7 +125,9 @@ for n in range(1, 11):
     hs_chars = len(hs_raw)
     parsed_chars = sum(len(v.get("term","")+v.get("meaning","")+v.get("pos","")+v.get("ipa","")) for v in vocab) + block_char_count(practice_blocks)
     print(f"Unit {n}: HS raw {hs_chars} chars | parsed(vocab+practice) ~{parsed_chars} chars | "
-          f"vocab={len(vocab)} practiceBlocks={len(practice_blocks)} answerBlocks={len(answer_blocks)}")
+          f"vocab={len(vocab)} practiceBlocks={len(practice_blocks)} answerBlocks={len(answer_blocks)} | "
+          f"MCQ graded {stats['mcq_graded']}/{stats['mcq_total']} | "
+          f"Exercise graded {stats['exercise_graded']}/{stats['exercise_total']}")
 
 # ---- Extract the two cumulative tests (mid-term / final) from Unit 5 and Unit 10 answerBlocks ----
 def extract_cumulative_test(blocks, key_marker_regex):
