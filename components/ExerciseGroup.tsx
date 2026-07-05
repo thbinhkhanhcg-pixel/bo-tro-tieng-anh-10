@@ -4,10 +4,16 @@ import { useState } from "react";
 import type { ContentBlock } from "@/lib/types";
 import type { ExerciseGroupEntry } from "@/lib/groupBlocks";
 import { isAnswerCorrect } from "@/lib/textMatch";
+import ClozeExercise from "./ClozeExercise";
+import UnderlinedText from "./UnderlinedText";
 
 function IntroBlock({ block }: { block: ContentBlock }) {
   if (block.type === "p") {
-    return <p className="leading-relaxed text-ink-soft">{block.text}</p>;
+    return (
+      <p className="leading-relaxed text-ink-soft">
+        <UnderlinedText text={block.text} underline={block.underline} />
+      </p>
+    );
   }
   if (block.type === "table") {
     return (
@@ -120,7 +126,7 @@ function ExerciseRow({
         <span className="mr-2 font-mono-tag text-sm font-700 text-chalk-blue">
           {item.num}.
         </span>
-        {item.text}
+        <UnderlinedText text={item.text} underline={item.underline} />
       </p>
       <div className="flex flex-wrap items-center gap-2">
         <input
@@ -163,24 +169,38 @@ export default function ExerciseGroup({
   intro: ContentBlock[];
   entries: ExerciseGroupEntry[];
 }) {
-  const [answers, setAnswers] = useState<Record<number, string>>({});
+  const [answers, setAnswers] = useState<Record<string, string>>({});
   const [submitted, setSubmitted] = useState(false);
 
-  const gradableEntries = entries.filter(
-    (e) =>
-      e.type === "item" &&
-      (e.correctLetter || (e.correctAnswers && e.correctAnswers.length > 0))
-  );
+  function gradablePointsFor(e: ExerciseGroupEntry): number {
+    if (e.type === "item") {
+      return e.correctLetter || (e.correctAnswers && e.correctAnswers.length > 0) ? 1 : 0;
+    }
+    if (e.type === "cloze") {
+      return e.correctAnswers && e.correctAnswers.length === e.blanks.length
+        ? e.blanks.length
+        : 0;
+    }
+    return 0;
+  }
+
+  const totalGradablePoints = entries.reduce((sum, e) => sum + gradablePointsFor(e), 0);
 
   function scoreCount() {
     let correct = 0;
     entries.forEach((e, i) => {
-      if (e.type !== "item") return;
-      const val = answers[i] ?? "";
-      if (e.correctLetter) {
-        if (val === e.correctLetter) correct++;
-      } else if (e.correctAnswers?.length) {
-        if (isAnswerCorrect(val, e.correctAnswers)) correct++;
+      if (e.type === "item") {
+        const val = answers[String(i)] ?? "";
+        if (e.correctLetter) {
+          if (val === e.correctLetter) correct++;
+        } else if (e.correctAnswers?.length) {
+          if (isAnswerCorrect(val, e.correctAnswers)) correct++;
+        }
+      } else if (e.type === "cloze" && e.correctAnswers?.length === e.blanks.length) {
+        e.blanks.forEach((blankNum, bi) => {
+          const val = answers[`${i}:${blankNum}`] ?? "";
+          if (isAnswerCorrect(val, [e.correctAnswers![bi]])) correct++;
+        });
       }
     });
     return correct;
@@ -223,6 +243,23 @@ export default function ExerciseGroup({
 
       <div className="space-y-3">
         {entries.map((entry, i) => {
+          if (entry.type === "cloze") {
+            const clozeValues: Record<string, string> = {};
+            for (const bn of entry.blanks) {
+              clozeValues[bn] = answers[`${i}:${bn}`] ?? "";
+            }
+            return (
+              <ClozeExercise
+                key={i}
+                block={entry}
+                values={clozeValues}
+                submitted={submitted}
+                onChange={(blankNum, v) =>
+                  setAnswers((a) => ({ ...a, [`${i}:${blankNum}`]: v }))
+                }
+              />
+            );
+          }
           if (entry.type !== "item") {
             return <IntroBlock key={i} block={entry} />;
           }
@@ -239,10 +276,10 @@ export default function ExerciseGroup({
               <McqRow
                 key={i}
                 item={entry}
-                selected={answers[i] ?? null}
+                selected={answers[String(i)] ?? null}
                 submitted={submitted}
                 onSelect={(letter) =>
-                  setAnswers((a) => ({ ...a, [i]: letter }))
+                  setAnswers((a) => ({ ...a, [String(i)]: letter }))
                 }
               />
             );
@@ -251,9 +288,9 @@ export default function ExerciseGroup({
             <ExerciseRow
               key={i}
               item={entry}
-              value={answers[i] ?? ""}
+              value={answers[String(i)] ?? ""}
               submitted={submitted}
-              onChange={(v) => setAnswers((a) => ({ ...a, [i]: v }))}
+              onChange={(v) => setAnswers((a) => ({ ...a, [String(i)]: v }))}
             />
           );
         })}
@@ -263,11 +300,11 @@ export default function ExerciseGroup({
         {submitted ? (
           <>
             <span className="font-mono-tag text-sm text-ink">
-              {gradableEntries.length > 0 ? (
+              {totalGradablePoints > 0 ? (
                 <>
                   Điểm:{" "}
                   <strong className="text-brick">
-                    {score}/{gradableEntries.length}
+                    {score}/{totalGradablePoints}
                   </strong>{" "}
                   câu có đáp án đối chiếu
                 </>

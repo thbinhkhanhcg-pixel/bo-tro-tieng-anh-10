@@ -1,4 +1,32 @@
 import re
+import json
+import os
+
+_UNDERLINE_PHRASES_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "underline_phrases.json")
+_underline_phrases = []
+if os.path.exists(_UNDERLINE_PHRASES_PATH):
+    with open(_UNDERLINE_PHRASES_PATH, encoding="utf-8") as _f:
+        _underline_phrases = json.load(_f)
+    # match longer phrases first so a longer underlined run isn't shadowed by a
+    # shorter phrase that happens to be its substring
+    _underline_phrases.sort(key=len, reverse=True)
+
+
+def find_underline_spans(text):
+    """Best-effort underline detection: the source PDF's underlines are drawn as
+    vector graphics, not a text attribute, so they can't be read from the same
+    per-character stream as bold. Instead we pre-extracted underlined phrases
+    from the whole document (see extract_underline_phrases.py) and match them
+    back in here -- only when a phrase appears EXACTLY ONCE in this text, to
+    avoid mis-underlining the wrong occurrence of a common phrase."""
+    if not _underline_phrases:
+        return []
+    found = []
+    remaining = text
+    for phrase in _underline_phrases:
+        if remaining.count(phrase) == 1:
+            found.append(phrase)
+    return found
 
 MAJOR_HEADING_RE = re.compile(
     r'^\s*(?:[A-E]\.\s*|Part\s+[IVXLC]+\.\s*|TEST\s*\d*\s*[:\.]?\s*)?'
@@ -9,6 +37,7 @@ ROMAN_HEADING_RE = re.compile(
 )
 NUM_ITEM_RE = re.compile(r'^\s*(\d{1,3})[\.\)]\s*(.*)$')
 BULLET_RE = re.compile(r'^\s*[-•●]\s+(\S.*)$')
+CLOZE_BLANK_RE = re.compile(r'\((\d{1,2})\)\s*[.…_]{3,}')
 
 # option patterns
 OPT_INLINE_SPLIT_RE = re.compile(r'(?=(?<!\S)[A-D]\.\s)')
@@ -50,7 +79,15 @@ def try_split_inline_options(line):
     return None
 
 
+CLOZE_LINE_HINT_RE = re.compile(r'\(\d{1,2}\)\s*(?:[.…_]{3,}|\*\*)')
+
+
 def is_table_line(line):
+    # A line peppered with cloze blank markers ("(1) ...." or, in the bold-reconstructed
+    # GV text, "(1)     **word**") naturally has wide gaps around each blank and would
+    # otherwise be misread as a multi-column table row.
+    if len(CLOZE_LINE_HINT_RE.findall(line)) >= 1:
+        return False
     return len(re.findall(r'\s{3,}', line.strip())) >= 2 and len(line.strip()) > 20
 
 
@@ -82,7 +119,28 @@ def parse_body(raw_body):
             text = " ".join(x.strip() for x in paragraph_buf if x.strip())
             text = re.sub(r'\s+', ' ', text).strip()
             if text:
-                blocks.append({"type": "p", "text": text})
+                blank_matches = list(CLOZE_BLANK_RE.finditer(text))
+                if len(blank_matches) >= 2:
+                    cloze_text = []
+                    blanks = []
+                    cursor = 0
+                    for m in blank_matches:
+                        cloze_text.append(text[cursor:m.start()])
+                        cloze_text.append("{" + m.group(1) + "}")
+                        blanks.append(m.group(1))
+                        cursor = m.end()
+                    cloze_text.append(text[cursor:])
+                    blocks.append({
+                        "type": "cloze",
+                        "text": "".join(cloze_text),
+                        "blanks": blanks,
+                    })
+                else:
+                    underline = find_underline_spans(text)
+                    block = {"type": "p", "text": text}
+                    if underline:
+                        block["underline"] = underline
+                    blocks.append(block)
         paragraph_buf = []
 
     def flush_table():
@@ -101,13 +159,18 @@ def parse_body(raw_body):
             item_type = "mcq" if cur_item.get("options") else (
                 "subheading" if looks_like_subheading(text) else "exercise"
             )
-            blocks.append({
+            block = {
                 "type": "item",
                 "itemType": item_type,
                 "num": cur_item["num"],
                 "text": text,
                 "options": cur_item.get("options", []),
-            })
+            }
+            if item_type == "exercise":
+                underline = find_underline_spans(text)
+                if underline:
+                    block["underline"] = underline
+            blocks.append(block)
         cur_item = None
 
     while i < n:
@@ -189,8 +252,13 @@ def parse_body(raw_body):
             i += 1
             continue
 
-        # table-ish line (multi-column spacing) - ends any open item too
-        if is_table_line(line):
+        # table-ish line (multi-column spacing) - ends any open item too.
+        # Once a table has started, stay "sticky": a wrapped continuation line of a
+        # multi-line table row (e.g. a grammar structure table whose columns wrap
+        # unevenly) often won't independently look table-ish, but since every other
+        # block type has already been ruled out above, treat it as another table
+        # row rather than letting it fall through and garble into a paragraph.
+        if is_table_line(line) or table_buf:
             flush_paragraph(); flush_item()
             table_buf.append(line)
             i += 1

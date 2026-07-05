@@ -192,8 +192,8 @@ def parse_body_bold(raw_body):
             i += 1
             continue
 
-        # table-ish line
-        if is_table_line(plain(line)):
+        # table-ish line - sticky once started (see parse_body.py for rationale)
+        if is_table_line(plain(line)) or table_buf:
             flush_paragraph(); flush_item()
             table_buf.append(line)
             i += 1

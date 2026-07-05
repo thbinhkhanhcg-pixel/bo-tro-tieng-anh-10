@@ -25,22 +25,23 @@ def reconstruct_page_lines(page_el, line_tol=3):
     for t in text_els:
         top = float(t.attrib.get("top", 0))
         left = float(t.attrib.get("left", 0))
+        width = float(t.attrib.get("width", 0))
         runs = node_text_and_bold(t)
         if not runs:
             continue
-        items.append((top, left, runs))
+        items.append((top, left, width, runs))
     items.sort(key=lambda x: (x[0], x[1]))
 
-    lines = []  # list of (top, [(left, runs)])
-    for top, left, runs in items:
+    lines = []  # list of (top, [(left, width, runs)])
+    for top, left, width, runs in items:
         placed = False
         for line in lines:
             if abs(line[0] - top) <= line_tol:
-                line[1].append((left, runs))
+                line[1].append((left, width, runs))
                 placed = True
                 break
         if not placed:
-            lines.append([top, [(left, runs)]])
+            lines.append([top, [(left, width, runs)]])
 
     lines.sort(key=lambda l: l[0])
     out_lines = []
@@ -48,11 +49,14 @@ def reconstruct_page_lines(page_el, line_tol=3):
         parts.sort(key=lambda p: p[0])
         # reconstruct line string with bold markers, inserting spacing based on left gaps
         pieces = []
-        prev_right_estimate = None
-        for left, runs in parts:
-            # rough gap detection: if left is much greater than prior text end, add spacing
-            if prev_right_estimate is not None:
-                gap = left - prev_right_estimate
+        prev_right = None
+        for left, width, runs in parts:
+            # gap detection using the PDF's own reported run width (accurate), not an
+            # estimate from character count -- character-count estimates drift enough
+            # (bold/serif glyph widths vary) to inject phantom multi-space gaps into
+            # ordinary prose, which later gets misread as a table by is_table_line().
+            if prev_right is not None:
+                gap = left - prev_right
                 if gap > 15:
                     pieces.append("    ")  # big gap -> column separation
             for seg, is_bold in runs:
@@ -62,9 +66,7 @@ def reconstruct_page_lines(page_el, line_tol=3):
                     pieces.append("@@B@@" + seg + "@@E@@")
                 else:
                     pieces.append(seg)
-            # estimate right edge roughly by char count (not exact, fallback)
-            total_len = sum(len(s) for s, _ in runs)
-            prev_right_estimate = left + max(total_len * 6, 10)
+            prev_right = left + width if width > 0 else left + sum(len(s) for s, _ in runs) * 6
         line_str = "".join(pieces)
         line_str = html.unescape(line_str)
         out_lines.append(line_str)

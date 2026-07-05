@@ -33,7 +33,9 @@ export function groupIntoSections(blocks: ContentBlock[]): Section[] {
   function flush() {
     if (buffer.length === 0 && heading === null) return;
     const hasGradable = buffer.some(
-      (b) => b.type === "item" && (b.itemType === "mcq" || b.itemType === "exercise")
+      (b) =>
+        (b.type === "item" && (b.itemType === "mcq" || b.itemType === "exercise")) ||
+        b.type === "cloze"
     );
     if (hasGradable) {
       const intro: ContentBlock[] = [];
@@ -41,7 +43,8 @@ export function groupIntoSections(blocks: ContentBlock[]): Section[] {
       let seenFirstItem = false;
       for (const b of buffer) {
         const isGradableItem =
-          b.type === "item" && (b.itemType === "mcq" || b.itemType === "exercise");
+          (b.type === "item" && (b.itemType === "mcq" || b.itemType === "exercise")) ||
+          b.type === "cloze";
         if (isGradableItem) seenFirstItem = true;
         if (!seenFirstItem) intro.push(b);
         else entries.push(b);

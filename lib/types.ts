@@ -15,9 +15,15 @@ export interface OptionBlock {
 export type ContentBlock =
   | { type: "h2"; text: string }
   | { type: "h3"; text: string }
-  | { type: "p"; text: string; answers?: string[] }
+  | { type: "p"; text: string; answers?: string[]; underline?: string[] }
   | { type: "bullet"; text: string; answers?: string[] }
   | { type: "table"; rows: string[][] }
+  | {
+      type: "cloze";
+      text: string; // passage with {N} placeholders marking each blank
+      blanks: string[]; // blank numbers in order, e.g. ["1","2",...]
+      correctAnswers?: string[]; // verified answers, same order as blanks
+    }
   | {
       type: "item";
       itemType: "mcq" | "exercise" | "subheading";
@@ -30,6 +36,11 @@ export type ContentBlock =
       correctLetter?: string;
       /** Verified correct fill-in answer(s), cross-referenced from the teacher's file. */
       correctAnswers?: string[];
+      /** Substring(s) of `text` that are underlined in the original document
+       *  (e.g. "make a question about the underlined part"). Best-effort:
+       *  underlines are vector graphics in the PDF, recovered by matching
+       *  known underlined phrases back into the text. */
+      underline?: string[];
     };
 
 export interface UnitData {

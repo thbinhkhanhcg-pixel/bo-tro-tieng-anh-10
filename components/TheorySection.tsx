@@ -1,5 +1,6 @@
 import type { ContentBlock } from "@/lib/types";
 import HighlightedText from "./HighlightedText";
+import UnderlinedText from "./UnderlinedText";
 
 function TheoryBlock({ block }: { block: ContentBlock }) {
   if (block.type === "item" && block.itemType === "subheading") {
@@ -15,7 +16,7 @@ function TheoryBlock({ block }: { block: ContentBlock }) {
   if (block.type === "p") {
     return (
       <p className="leading-relaxed text-ink">
-        <HighlightedText text={block.text} answers={block.answers} />
+        <UnderlinedText text={block.text} underline={block.underline} />
       </p>
     );
   }
