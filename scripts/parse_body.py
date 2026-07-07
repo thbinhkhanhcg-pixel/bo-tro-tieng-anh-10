@@ -1,6 +1,7 @@
 import re
 import json
 import os
+import unicodedata
 
 _UNDERLINE_PHRASES_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "underline_phrases.json")
 _underline_phrases = []
@@ -151,14 +152,23 @@ def parse_body(raw_body):
         table_buf = []
 
     cur_item = None
+    in_exercise_mode = [False]  # becomes True right after a "BÀI TẬP..." heading,
+    # reset to False on every other h2 (a new all-caps topic/section heading) --
+    # see the h2-handling branch below. While False, numbered lines are treated
+    # as short theory sub-points (e.g. "3. Trạng từ tần suất...") rather than as
+    # gradable exercise items, since real exercises never appear before the
+    # document's own "BÀI TẬP" marker. (list-wrapped so nested closures can mutate it)
 
     def flush_item():
         nonlocal cur_item
         if cur_item is not None:
             text = re.sub(r'\s+', ' ', cur_item["text"]).strip()
-            item_type = "mcq" if cur_item.get("options") else (
-                "subheading" if looks_like_subheading(text) else "exercise"
-            )
+            if cur_item.get("options"):
+                item_type = "mcq"
+            elif not in_exercise_mode[0]:
+                item_type = "subheading"
+            else:
+                item_type = "subheading" if looks_like_subheading(text) else "exercise"
             block = {
                 "type": "item",
                 "itemType": item_type,
@@ -189,6 +199,16 @@ def parse_body(raw_body):
         mh = classify_major_heading(line)
         if mh and not NUM_ITEM_RE.match(line):
             flush_paragraph(); flush_table(); flush_item()
+            mh_norm = unicodedata.normalize('NFC', mh)
+            if re.search(r'BÀI\s*TẬP', mh_norm, re.IGNORECASE):
+                in_exercise_mode[0] = True
+            elif re.match(r'^[IVXLC]+\.\s', mh_norm) or re.search(r'\bGRAMMAR\b', mh_norm, re.IGNORECASE):
+                # a grammar *topic* heading (roman-numeral prefixed, e.g. "II. THE
+                # PRESENT CONTINUOUS TENSE") or the section marker itself ("A./B. GRAMMAR")
+                # always introduces theory prose next -- reset to theory mode.
+                in_exercise_mode[0] = False
+            # any other h2 (TEST N, VOCABULARY AND GRAMMAR, READING, WRITING, ...)
+            # doesn't by itself imply theory vs exercise, so leave the mode as-is.
             blocks.append({"type": "h2", "text": mh})
             i += 1
             continue
@@ -213,6 +233,13 @@ def parse_body(raw_body):
                     cur_item = {"num": nm.group(1), "text": stem, "options": inline_opts_here}
                 else:
                     cur_item = {"num": nm.group(1), "text": rest}
+                    if not in_exercise_mode[0]:
+                        # theory sub-point (e.g. "3. Trạng từ tần suất...") -- flush
+                        # immediately as its own short heading rather than letting
+                        # the explanatory paragraph that follows get absorbed into it.
+                        flush_item()
+                        i += 1
+                        continue
                 i += 1
                 continue
             # else: falls through, likely a genuine table row without recognizable options
