@@ -37,7 +37,8 @@ ROMAN_HEADING_RE = re.compile(
     r'^\s*((?:Exercise\s*\d+\.)|(?:Part\s+[IVXLC]+\.)|(?:Bài\s*\d+\s*:)|(?:[IVXLC]{1,6}[\.\)]))\s+(\S.+)$'
 )
 NUM_ITEM_RE = re.compile(r'^\s*(\d{1,3})[\.\)]\s*(.*)$')
-BULLET_RE = re.compile(r'^\s*[-•●]\s+(\S.*)$')
+BULLET_RE = re.compile(r'^\s*([-•●+]|[a-d]\.)\s+(\S.*)$')
+EXAMPLE_BREAK_RE = re.compile(r'^\s*(E\.?g\.?|Ex\.?|Note)\s*:', re.IGNORECASE)
 CLOZE_BLANK_RE = re.compile(r'\((\d{1,2})\)\s*[.…_]{3,}')
 
 # option patterns
@@ -144,10 +145,36 @@ def parse_body(raw_body):
                     blocks.append(block)
         paragraph_buf = []
 
+    def normalize_table_rows(rows):
+        """When a physical PDF line wraps a table row's later column(s) onto the
+        next line (or drops a column's spacing entirely), the naive split produces
+        a row with fewer cells than the table's real column count. Merge any such
+        short row into the previous row (cell-by-cell) instead of showing it as
+        its own ragged, misaligned row."""
+        if not rows:
+            return rows
+        counts = [len(r) for r in rows if len(r) >= 2]
+        if not counts:
+            return rows
+        expected = max(set(counts), key=counts.count)
+        merged = [rows[0]]
+        for row in rows[1:]:
+            if len(row) < expected and merged:
+                prev = merged[-1]
+                for i, cell in enumerate(row):
+                    if i < len(prev):
+                        prev[i] = (prev[i] + " " + cell).strip()
+                    else:
+                        prev.append(cell)
+            else:
+                merged.append(row)
+        return merged
+
     def flush_table():
         nonlocal table_buf
         if table_buf:
             rows = [re.split(r'\s{2,}', r.strip()) for r in table_buf]
+            rows = normalize_table_rows(rows)
             blocks.append({"type": "table", "rows": rows})
         table_buf = []
 
@@ -271,11 +298,24 @@ def parse_body(raw_body):
             i += 1
             continue
 
-        # bullet list item (always ends any open item - bullets are theory content, not exercise continuation)
-        bm = BULLET_RE.match(line)
+        # bullet list item (always ends any open item - bullets are theory content,
+        # not exercise continuation). Skipped while a table is "sticky" (table_buf
+        # non-empty), since a wrapped table cell can coincidentally start with "+"
+        # (e.g. a continuation of "... V (bare-inf) +" onto "+ (O). (O)?") and that
+        # must stay part of the table, not be read as a new bullet point.
+        bm = BULLET_RE.match(line) if not table_buf else None
         if bm:
             flush_paragraph(); flush_table(); flush_item()
-            blocks.append({"type": "bullet", "text": bm.group(1).strip()})
+            blocks.append({"type": "bullet", "text": bm.group(2).strip()})
+            i += 1
+            continue
+
+        # "E.g:", "Note:", "Ex:" lines mark a distinct aside/example -- always start
+        # a fresh paragraph here rather than silently trailing onto whatever prose
+        # came right before it (source has no blank line between these in many spots).
+        if EXAMPLE_BREAK_RE.match(line) and cur_item is None:
+            flush_paragraph(); flush_table()
+            paragraph_buf.append(stripped)
             i += 1
             continue
 
