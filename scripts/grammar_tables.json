@@ -1,0 +1,121 @@
+[
+  [
+    [
+      "Affirmative (Khẳng định)",
+      "Negative (Phủ định)",
+      "Interrogative (Nghi vấn)"
+    ],
+    [
+      "S + V (s/es) + (O).",
+      "S + do/does + not + V (bare- inf) + (O).",
+      "Do/ Does + S + V (bare-inf) + (O)?"
+    ],
+    [
+      "She does the housework every",
+      "She doesn’t do the housework",
+      "Does she do the housework"
+    ]
+  ],
+  [
+    [
+      "Affirmative (Khẳng định)",
+      "Negative (Phủ định)",
+      "Interrogative (Nghi vấn)"
+    ],
+    [
+      "S + is/ am/ are + V-ing + (O).",
+      "S + is/am/are + not+ V-ing + (O).",
+      "Am/ Are/ Is + S + V-ing + (O)?"
+    ],
+    [
+      "Mr. Nam is driving to work.",
+      "Mr. Nam isn’t driving to work.",
+      "Is Mr. Nam driving to work?"
+    ]
+  ],
+  [
+    [
+      "Affirmative (Khẳng định)",
+      "Negative (Phủ định)",
+      "Interrogative (Nghi vấn)"
+    ],
+    [
+      "S + will + V (bare-inf) + (O)",
+      "S + will + not + V (bare-inf) + (O)",
+      "Will + S + V (bare-inf) + (O)?"
+    ],
+    [
+      "The shop will open in June.",
+      "The shop won’t open in June.",
+      "Will the shop open in June?"
+    ]
+  ],
+  [
+    [
+      "Affirmative (Khẳng định)",
+      "Negative (Phủ định)",
+      "Interrogative (Nghi vấn)"
+    ],
+    [
+      "S + is/ am/ are + going to +",
+      "S + is/ am/ are + not + going to",
+      "Is/ Am/ Are + S + going to +"
+    ],
+    [
+      "V(bare-inf) + (O)",
+      "+ V(bare-inf) + (O)",
+      "V(bare-inf) + (O)?"
+    ]
+  ],
+  [
+    [
+      "Affirmative",
+      "Negative",
+      "Interrogative"
+    ],
+    [
+      "S + V (past) (+ O)",
+      "S + did not/ didn't + V(bare-inf) (+ O)",
+      "Did + S + V(bare-inf) (+ O)?"
+    ],
+    [
+      "They went to the",
+      "They didn't go to the cinema last night.",
+      "Did they go to the cinema last"
+    ]
+  ],
+  [
+    [
+      "Affirmative",
+      "Negative",
+      "Interrogative"
+    ],
+    [
+      "S + was/ were + V-ing (+O)",
+      "S + was/ were + not + V-ing (+O)",
+      "Was/ Were + S +V-ing (+O)?"
+    ],
+    [
+      "My brother was reading books",
+      "My brother wasn't reading books",
+      "Was your brother reading books"
+    ]
+  ],
+  [
+    [
+      "Affirmative (Khẳng định)",
+      "Negative (Phủ định)",
+      "Interrogative (Nghi vấn)"
+    ],
+    [
+      "S + have/ has + pp (past",
+      "S + have/ has + not + pp + (0)",
+      "Have/ Has + S + PP + (0)?"
+    ],
+    [
+      "participle) + (0)",
+      "",
+      ""
+    ]
+  ]
+]

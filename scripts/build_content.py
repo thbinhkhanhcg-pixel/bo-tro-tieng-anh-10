@@ -1,4 +1,4 @@
-import json, pickle, re, sys
+import json, pickle, re, sys, os, unicodedata
 sys.path.insert(0, "/home/claude/project/scripts")
 from parse_vocab import extract_vocab_for_unit
 from parse_body import parse_body
@@ -61,6 +61,34 @@ def merge_adjacent_cloze(practice_blocks):
             merged.append(b)
             i += 1
     return merged
+
+
+def load_corrected_grammar_tables():
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "grammar_tables.json")
+    if not os.path.exists(path):
+        return []
+    with open(path, encoding="utf-8") as f:
+        return json.load(f)
+
+
+_GRAMMAR_TABLE_HEADER_RE = re.compile(r'^Affirmative\b', re.IGNORECASE)
+
+
+def replace_grammar_tables(practice_blocks, corrected_tables, cursor):
+    """Swap each garbled 'Affirmative/Negative/Interrogative' structure table for
+    its properly reconstructed version (built from true PDF word coordinates —
+    see extract_grammar_tables.py), matched strictly in document order since
+    both this pass and that script walk the same PDF front-to-back."""
+    for b in practice_blocks:
+        if (
+            b["type"] == "table"
+            and b["rows"]
+            and _GRAMMAR_TABLE_HEADER_RE.match(unicodedata.normalize("NFC", b["rows"][0][0]))
+            and cursor[0] < len(corrected_tables)
+        ):
+            b["rows"] = corrected_tables[cursor[0]]
+            cursor[0] += 1
+    return practice_blocks
 
 
 def build_answer_index(answer_blocks):
@@ -171,6 +199,8 @@ def enrich_with_answers(practice_blocks, answer_index, cloze_index):
 
 
 units_out = {}
+_corrected_grammar_tables = load_corrected_grammar_tables()
+_grammar_table_cursor = [0]
 for n in range(1, 11):
     hs_raw = data["hs"][n]["raw"]
     gvb_raw = data["gvb"][n]["raw"]
@@ -178,6 +208,7 @@ for n in range(1, 11):
     vocab, hs_body_raw = extract_vocab_for_unit(hs_raw)
     practice_blocks = parse_body(hs_body_raw)
     practice_blocks = merge_adjacent_cloze(practice_blocks)
+    practice_blocks = replace_grammar_tables(practice_blocks, _corrected_grammar_tables, _grammar_table_cursor)
 
     # For GV-bold, vocab block is same content (redundant) -- strip markers before locating
     _, gvb_body_raw = extract_vocab_for_unit(plain(gvb_raw))
