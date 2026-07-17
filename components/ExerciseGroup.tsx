@@ -6,14 +6,11 @@ import type { ExerciseGroupEntry } from "@/lib/groupBlocks";
 import { isAnswerCorrect } from "@/lib/textMatch";
 import ClozeExercise from "./ClozeExercise";
 import UnderlinedText from "./UnderlinedText";
+import StyledParagraph from "./StyledParagraph";
 
 function IntroBlock({ block }: { block: ContentBlock }) {
   if (block.type === "p") {
-    return (
-      <p className="leading-relaxed text-ink-soft">
-        <UnderlinedText text={block.text} underline={block.underline} />
-      </p>
-    );
+    return <StyledParagraph text={block.text} underline={block.underline} />;
   }
   if (block.type === "table") {
     return (

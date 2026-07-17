@@ -1,5 +1,6 @@
 import type { ContentBlock } from "@/lib/types";
 import HighlightedText from "./HighlightedText";
+import StyledParagraph from "./StyledParagraph";
 
 export default function AnswerBlocks({ blocks }: { blocks: ContentBlock[] }) {
   return (
@@ -26,9 +27,7 @@ export default function AnswerBlocks({ blocks }: { blocks: ContentBlock[] }) {
             );
           case "p":
             return (
-              <p key={i} className="leading-relaxed text-ink">
-                <HighlightedText text={b.text} answers={b.answers} />
-              </p>
+              <StyledParagraph key={i} text={b.text} answers={b.answers} />
             );
           case "bullet":
             return (

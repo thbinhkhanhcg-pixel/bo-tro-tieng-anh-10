@@ -1,11 +1,17 @@
 import type { ContentBlock } from "@/lib/types";
 import HighlightedText from "./HighlightedText";
-import UnderlinedText from "./UnderlinedText";
+import StyledParagraph, { EXAMPLE_RE, NOTE_RE } from "./StyledParagraph";
 
-function TheoryBlock({ block }: { block: ContentBlock }) {
+function TheoryBlock({
+  block,
+  prevType,
+}: {
+  block: ContentBlock;
+  prevType: string | null;
+}) {
   if (block.type === "item" && block.itemType === "subheading") {
     return (
-      <p className="mt-4 flex items-center gap-2 font-display text-lg font-700 text-pine first:mt-0">
+      <p className="mt-5 flex items-center gap-2 font-display text-lg font-700 text-pine first:mt-0">
         <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-pine font-mono-tag text-[11px] text-paper-light">
           {block.num}
         </span>
@@ -13,17 +19,23 @@ function TheoryBlock({ block }: { block: ContentBlock }) {
       </p>
     );
   }
+
   if (block.type === "p") {
+    const tight =
+      prevType === "bullet" &&
+      (EXAMPLE_RE.test(block.text) || NOTE_RE.test(block.text));
     return (
-      <p className="leading-relaxed text-ink">
-        <UnderlinedText text={block.text} underline={block.underline} />
-      </p>
+      <StyledParagraph
+        text={block.text}
+        underline={block.underline}
+        tight={tight}
+      />
     );
   }
   if (block.type === "bullet") {
     return (
-      <div className="flex gap-2 pl-1 leading-relaxed text-ink">
-        <span className="mt-0.5 text-chalk-blue">▸</span>
+      <div className="flex gap-2 pl-1 font-600 leading-relaxed text-ink">
+        <span className="mt-0.5 shrink-0 text-pine">▸</span>
         <span>
           <HighlightedText text={block.text} answers={block.answers} />
         </span>
@@ -79,7 +91,11 @@ export default function TheorySection({
       )}
       <div className="space-y-2.5">
         {blocks.map((b, i) => (
-          <TheoryBlock key={i} block={b} />
+          <TheoryBlock
+            key={i}
+            block={b}
+            prevType={i > 0 ? blocks[i - 1].type : null}
+          />
         ))}
       </div>
     </div>
